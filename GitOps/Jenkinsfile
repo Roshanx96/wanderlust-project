@@ -10,7 +10,7 @@ pipeline {
     environment {
         GIT_REPO = 'https://github.com/Roshanx96/wanderlust-mega-project.git'
         DOCKERHUB_USER = 'roshanx'
-        EMAIL_RECIPIENTS = 'team@example.com'
+        EMAIL_RECIPIENTS = 'roshankhopade5339@gmail.com'
     }
 
     stages {
