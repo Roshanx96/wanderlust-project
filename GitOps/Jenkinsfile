@@ -47,7 +47,7 @@ pipeline {
                  body: "The Wanderlust CD pipeline completed successfully. Kubernetes manifests updated."
         }
         failure {
-            mail to: 'your-email@example.com',
+            mail to: 'roshankhopade5339@gmail.com',
                  subject: "❌ Wanderlust CD Pipeline Failed",
                  body: "The Wanderlust CD pipeline has failed. Please check Jenkins."
         }
