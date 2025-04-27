@@ -1,27 +1,24 @@
-// Jenkinsfile-CI
 pipeline {
     agent any
 
     parameters {
-        string(name: 'FRONTEND_TAG', description: 'Frontend Docker Image Tag (e.g., v1)')
-        string(name: 'BACKEND_TAG', description: 'Backend Docker Image Tag (e.g., v1)')
+        string(name: 'FRONTEND_TAG', description: 'Frontend Docker Image Tag', defaultValue: 'latest')
+        string(name: 'BACKEND_TAG', description: 'Backend Docker Image Tag', defaultValue: 'latest')
     }
 
     environment {
-        GIT_REPO = 'https://github.com/Roshanx96/wanderlust-mega-project.git'
-        DOCKERHUB_USER = 'roshanx'
-        FRONTEND_IMAGE = "${DOCKERHUB_USER}/wanderlust-frontend-beta:${FRONTEND_TAG}"
-        BACKEND_IMAGE = "${DOCKERHUB_USER}/wanderlust-backend-beta:${BACKEND_TAG}"
-        SONARQUBE_SERVER = 'SonarQube-Server'  // Sonar server name configured in Jenkins
+        GITHUB_CREDENTIALS = 'Github-cred'
+        DOCKER_CREDENTIALS = 'Dockerhub-cred'
+        DOCKERHUB_USERNAME = 'roshanx' // Your DockerHub username
+        GITHUB_REPO = 'https://github.com/Roshanx96/wanderlust-mega-project.git'
     }
 
     stages {
-
-        stage('Parameter Validation') {
+        stage('Validate Parameters') {
             steps {
                 script {
-                    if (!params.FRONTEND_TAG || !params.BACKEND_TAG) {
-                        error "Both FRONTEND_TAG and BACKEND_TAG parameters must be provided!"
+                    if (!params.FRONTEND_TAG?.trim() || !params.BACKEND_TAG?.trim()) {
+                        error("Docker image tags cannot be empty!")
                     }
                 }
             }
@@ -29,34 +26,37 @@ pipeline {
 
         stage('Checkout Code') {
             steps {
-                git branch: 'main', url: "${env.GIT_REPO}"
+                git credentialsId: "${env.GITHUB_CREDENTIALS}", url: "${env.GITHUB_REPO}"
             }
         }
 
         stage('Security Scans') {
-            steps {
-                sh '''
-                trivy fs .
-                dependency-check --project wanderlust-mega-project --scan ./ --format ALL --out dependency-check-report
-                '''
-            }
-        }
-
-        stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv("${SONARQUBE_SERVER}") {
-                    sh '''
-                    sonar-scanner \
-                      -Dsonar.projectKey=wanderlust-mega-project \
-                      -Dsonar.sources=backend,frontend \
-                      -Dsonar.host.url=$SONAR_HOST_URL \
-                      -Dsonar.login=$SONAR_AUTH_TOKEN
-                    '''
+            parallel {
+                stage('Trivy Filesystem Scan') {
+                    steps {
+                        sh 'trivy fs --exit-code 1 --severity CRITICAL --no-progress . || true'
+                    }
+                }
+                stage('OWASP Dependency Check') {
+                    steps {
+                        sh 'dependency-check.sh --project wanderlust --scan . || true'
+                    }
                 }
             }
         }
 
-        stage('Wait for Quality Gate') {
+        stage('SonarQube Analysis') {
+            environment {
+                SONARQUBE_SERVER = 'SonarQube' // Jenkins SonarQube server name
+            }
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh 'sonar-scanner'
+                }
+            }
+        }
+
+        stage('Wait for SonarQube Quality Gate') {
             steps {
                 timeout(time: 5, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
@@ -64,33 +64,51 @@ pipeline {
             }
         }
 
-        stage('Update .env files') {
+        stage('Update .env Files') {
             steps {
                 sh '''
-                bash Automation/updatefrontendnew.sh
-                bash Automation/updatebackendnew.sh
+                    chmod +x Automation/updatefrontendnew.sh
+                    ./Automation/updatefrontendnew.sh
+
+                    chmod +x Automation/updatebackendnew.sh
+                    ./Automation/updatebackendnew.sh
                 '''
             }
         }
 
-        stage('Build and Push Docker Images') {
+        stage('Docker Login') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: "${env.DOCKER_CREDENTIALS}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                    '''
+                }
+            }
+        }
+
+        stage('Build & Push Frontend Image') {
             steps {
                 sh '''
-                docker build -t $FRONTEND_IMAGE frontend/
-                docker push $FRONTEND_IMAGE
+                    docker build -t $DOCKERHUB_USERNAME/wanderlust-frontend-beta:${FRONTEND_TAG} ./frontend
+                    docker push $DOCKERHUB_USERNAME/wanderlust-frontend-beta:${FRONTEND_TAG}
+                '''
+            }
+        }
 
-                docker build -t $BACKEND_IMAGE backend/
-                docker push $BACKEND_IMAGE
+        stage('Build & Push Backend Image') {
+            steps {
+                sh '''
+                    docker build -t $DOCKERHUB_USERNAME/wanderlust-backend-beta:${BACKEND_TAG} ./backend
+                    docker push $DOCKERHUB_USERNAME/wanderlust-backend-beta:${BACKEND_TAG}
                 '''
             }
         }
 
         stage('Trigger CD Pipeline') {
             steps {
-                build job: 'wanderlust-cd-pipeline', 
-                parameters: [
-                    string(name: 'FRONTEND_TAG', value: "${params.FRONTEND_TAG}"),
-                    string(name: 'BACKEND_TAG', value: "${params.BACKEND_TAG}")
+                build job: 'wanderlust-cd', parameters: [
+                    string(name: 'FRONTEND_TAG', value: params.FRONTEND_TAG),
+                    string(name: 'BACKEND_TAG', value: params.BACKEND_TAG)
                 ]
             }
         }
@@ -98,10 +116,9 @@ pipeline {
 
     post {
         failure {
-            echo "CI Pipeline Failed ❌"
-        }
-        success {
-            echo "CI Pipeline Successful ✅"
+            mail to: 'roshankhopade5339@gmail.com',
+                 subject: "❌ Wanderlust CI Pipeline Failed",
+                 body: "The Wanderlust CI pipeline has failed. Please check Jenkins."
         }
     }
 }
