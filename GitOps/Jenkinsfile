@@ -1,44 +1,40 @@
-// Jenkinsfile-CD
 pipeline {
     agent any
 
     parameters {
-        string(name: 'FRONTEND_TAG', description: 'Frontend Docker Image Tag (e.g., v1)')
-        string(name: 'BACKEND_TAG', description: 'Backend Docker Image Tag (e.g., v1)')
+        string(name: 'FRONTEND_TAG', description: 'Frontend Docker Image Tag', defaultValue: 'latest')
+        string(name: 'BACKEND_TAG', description: 'Backend Docker Image Tag', defaultValue: 'latest')
     }
 
     environment {
-        GIT_REPO = 'https://github.com/Roshanx96/wanderlust-mega-project.git'
-        DOCKERHUB_USER = 'roshanx'
-        EMAIL_RECIPIENTS = 'roshankhopade5339@gmail.com'
+        GITHUB_CREDENTIALS = 'Github-cred'
+        GITHUB_REPO = 'https://github.com/Roshanx96/wanderlust-mega-project.git'
     }
 
     stages {
-
         stage('Checkout Code') {
             steps {
-                git branch: 'main', url: "${env.GIT_REPO}"
+                git credentialsId: "${env.GITHUB_CREDENTIALS}", url: "${env.GITHUB_REPO}"
             }
         }
 
         stage('Update Kubernetes Manifests') {
             steps {
                 sh '''
-                sed -i "s|roshanx/wanderlust-frontend-beta:.*|roshanx/wanderlust-frontend-beta:${FRONTEND_TAG}|g" kubernetes/frontend.yaml
-                sed -i "s|roshanx/wanderlust-backend-beta:.*|roshanx/wanderlust-backend-beta:${BACKEND_TAG}|g" kubernetes/backend.yaml
+                    sed -i "s|roshanx/wanderlust-frontend-beta:.*|roshanx/wanderlust-frontend-beta:${FRONTEND_TAG}|g" kubernetes/frontend.yaml
+                    sed -i "s|roshanx/wanderlust-backend-beta:.*|roshanx/wanderlust-backend-beta:${BACKEND_TAG}|g" kubernetes/backend.yaml
                 '''
             }
         }
 
-        stage('Commit and Push Updated Manifests') {
+        stage('Commit and Push Changes') {
             steps {
                 sh '''
-                git config user.email "jenkins@wanderlust.com"
-                git config user.name "Jenkins CI/CD Bot"
-
-                git add kubernetes/frontend.yaml kubernetes/backend.yaml
-                git commit -m "Update image tags to frontend:${FRONTEND_TAG}, backend:${BACKEND_TAG}"
-                git push origin main
+                    git config user.email "jenkins@example.com"
+                    git config user.name "Jenkins CI"
+                    git add kubernetes/frontend.yaml kubernetes/backend.yaml
+                    git commit -m "Update Kubernetes manifests with new Docker tags [CI/CD]"
+                    git push origin main
                 '''
             }
         }
@@ -46,18 +42,14 @@ pipeline {
 
     post {
         success {
-            emailext(
-                subject: "✅ Wanderlust CD Pipeline Success",
-                body: "The CD pipeline completed successfully. New versions deployed!\nFrontend: ${params.FRONTEND_TAG}\nBackend: ${params.BACKEND_TAG}",
-                to: "${env.EMAIL_RECIPIENTS}"
-            )
+            mail to: 'your-email@example.com',
+                 subject: "✅ Wanderlust CD Pipeline Successful",
+                 body: "The Wanderlust CD pipeline completed successfully. Kubernetes manifests updated."
         }
         failure {
-            emailext(
-                subject: "❌ Wanderlust CD Pipeline Failed",
-                body: "The CD pipeline failed. Please investigate immediately!",
-                to: "${env.EMAIL_RECIPIENTS}"
-            )
+            mail to: 'your-email@example.com',
+                 subject: "❌ Wanderlust CD Pipeline Failed",
+                 body: "The Wanderlust CD pipeline has failed. Please check Jenkins."
         }
     }
 }
