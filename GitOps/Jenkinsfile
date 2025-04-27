@@ -42,7 +42,7 @@ pipeline {
 
     post {
         success {
-            mail to: 'your-email@example.com',
+            mail to: 'roshankhopade5339@gmail.com',
                  subject: "✅ Wanderlust CD Pipeline Successful",
                  body: "The Wanderlust CD pipeline completed successfully. Kubernetes manifests updated."
         }
