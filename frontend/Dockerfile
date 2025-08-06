@@ -1,18 +1,32 @@
-# Stage 1: Build static assets (if using Sass, PostCSS, etc.) - skipped here
-# Just copying public files
+# ------------------- Stage 1: Build Stage ------------------------------
+FROM node:21 AS frontend-builder
 
-# Stage 2: Nginx for serving static assets
-FROM nginx:alpine
+# Set the working directory to /app
+WORKDIR /app
 
-# Remove default nginx config
-RUN rm /etc/nginx/conf.d/default.conf
+# Copy the package.json and package-lock.json for dependency installation
+COPY package*.json ./
 
-# Copy custom nginx config
-COPY nginx.conf /etc/nginx/conf.d
+# Install dependencies
+RUN npm install
 
-# Copy public assets
-COPY public/ /usr/share/nginx/html/
+# Copy the rest of the application code
+COPY . .
 
-EXPOSE 80
+# ------------------- Stage 2: Final Stage ------------------------------
+FROM node:21-slim
 
-CMD ["nginx", "-g", "daemon off;"]
+# Set the working directory to /app
+WORKDIR /app
+
+# Copy built assets and dependencies from frontend-builder stage
+COPY --from=frontend-builder /app .
+
+# Copy the .env.sample file to .env.local
+COPY .env.docker .env.local
+
+# Expose port 5173 for the Node.js application
+EXPOSE 5173
+
+# Define the default command to run the application in development mode
+CMD ["npm", "run", "dev", "--", "--host"]
