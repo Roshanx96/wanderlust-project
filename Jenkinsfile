@@ -11,7 +11,7 @@ pipeline {
         DOCKER_CREDENTIALS = 'Dockerhub-cred'
         DOCKERHUB_USERNAME = 'roshanx' // Your DockerHub username
         SONAR_HOME = tool "SonarQube"
-        GITHUB_REPO = 'https://github.com/Roshanx96/wanderlust-mega-project-2.0.git'
+        GITHUB_REPO = 'https://github.com/Roshanx96/wanderlust-project.git'
     }
 
     stages {
@@ -91,18 +91,6 @@ pipeline {
                 timeout(time: 1, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
-            }
-        }
-
-        stage('Update .env Files') {
-            steps {
-                sh '''
-                    chmod +x Automation/updatefrontendnew.sh
-                    ./Automation/updatefrontendnew.sh
-
-                    chmod +x Automation/updatebackendnew.sh
-                    ./Automation/updatebackendnew.sh
-                '''
             }
         }
 
