@@ -22,10 +22,16 @@ WORKDIR /app
 # copy the above stage as compressed
 COPY --from=backend-builder /app .
 
-COPY .env.docker .env
+# Do not copy .env.docker at build time so builds don't fail when the repo doesn't contain env files.
+# Runtime configuration should be provided with k8s ConfigMaps/Secrets or container env vars. The entrypoint
+# will write runtime env values into /app/.env when present.
+# Copy entrypoint script to allow runtime injection of env vars
+COPY ops/entrypoint.sh ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh
 
 # Port
 EXPOSE 8080
 
 # App
+ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["npm", "start"]

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+  namespace: wanderlust
+data:
+  VITE_API_PATH: "http://backend-service:31100"

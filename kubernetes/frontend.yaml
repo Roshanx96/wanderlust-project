@@ -19,6 +19,9 @@ spec:
       containers:
         - name: frontend
           image: roshanx/wanderlust-frontend-beta:v1
+          envFrom:
+            - configMapRef:
+                name: frontend-config
           ports:
             - containerPort: 5173
 ---

@@ -19,6 +19,11 @@ spec:
       containers:
         - name: backend
           image: roshanx/wanderlust-backend-beta:v1
+          envFrom:
+            - configMapRef:
+                name: backend-config
+            - secretRef:
+                name: backend-secret
           ports:
             - containerPort: 8080
 ---
