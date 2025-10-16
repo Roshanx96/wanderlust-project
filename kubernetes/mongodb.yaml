@@ -1,44 +1,55 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
-  name: mongo-deployment
+  name: mongo-statefulset
   namespace: wanderlust
   labels:
     app: mongo
 spec:
+  serviceName: "mongo-headless"
   replicas: 1
   selector:
     matchLabels:
       app: mongo
   template:
     metadata:
-      name: mongo
       labels:
         app: mongo
     spec:
       containers:
         - name: mongo
-          image: mongo
+          image: mongo:6.0
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 27017
+              name: mongodb
           volumeMounts:
             - name: mongo-storage
               mountPath: /data/db
-      volumes:
-        - name: mongo-storage
-          persistentVolumeClaim:
-            claimName: mongo-pvc
+  volumeClaimTemplates:
+    - metadata:
+        name: mongo-storage
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 5Gi
+        storageClassName: gp3
 
 ---
+# Headless service for StatefulSet discovery
 apiVersion: v1
 kind: Service
 metadata:
-  name: mongo-service
+  name: mongo-headless
   namespace: wanderlust
 spec:
+  clusterIP: None
   selector:
     app: mongo
   ports:
     - port: 27017
       targetPort: 27017
       protocol: TCP
+
+

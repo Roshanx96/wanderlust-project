@@ -1,0 +1,37 @@
+# apiVersion: v1
+# kind: PersistentVolume
+# metadata:
+#   name: mongo-pv
+#   labels:
+#     type: local
+# spec:
+#   capacity:
+#     storage: 5Gi
+#   volumeMode: Filesystem
+#   accessModes:
+#     - ReadWriteOnce
+#   persistentVolumeReclaimPolicy: Retain
+#   storageClassName: manual
+#   hostPath:
+#     path: /mnt/data/mongo   # Use a distinct directory from Redis
+# ---
+# apiVersion: v1
+# kind: PersistentVolumeClaim
+# metadata:
+#   name: mongo-pvc
+#   namespace: wanderlust
+# spec:
+#   accessModes:
+#     - ReadWriteOnce
+#   resources:
+#     requests:
+#       storage: 5Gi
+#   storageClassName: manual
+
+
+
+
+
+# NOTE: This uses hostPath and storageClassName 'manual' which only works on single-node or bare-metal clusters.
+# For cloud providers (GKE/AKS/EKS) use a provider storageClass (e.g. 'standard' or a dynamic provisioner) and
+# remove hostPath.
