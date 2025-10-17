@@ -8,7 +8,7 @@ pipeline {
 
     environment {
         GIT_CREDENTIALS_ID = 'github-credentials'
-        GIT_REPO_URL = 'https://github.com/Roshanx96/wanderlust.git'
+        GIT_REPO_URL = 'https://github.com/Roshanx96/wanderlust-project.git'
         GIT_BRANCH = 'main'
     }
 
@@ -57,11 +57,22 @@ pipeline {
                         git config user.email 'jenkins@yourdomain.com'
                         git add kubernetes/frontend.yaml kubernetes/backend.yaml
                         git commit -m 'Update image tags: frontend=${params.FRONTEND_TAG}, backend=${params.BACKEND_TAG}' || echo 'No changes to commit'
+                        # Ensure the branch exists locally and track origin/${env.GIT_BRANCH}
+                        git fetch origin ${env.GIT_BRANCH} || true
+                        if git show-ref --verify --quiet refs/heads/${env.GIT_BRANCH}; then
+                            echo "Local branch ${env.GIT_BRANCH} exists"
+                        else
+                            echo "Creating local branch ${env.GIT_BRANCH}"
+                            git branch ${env.GIT_BRANCH} || git checkout -b ${env.GIT_BRANCH}
+                        fi
+                        git checkout ${env.GIT_BRANCH} || git checkout -b ${env.GIT_BRANCH}
                     """
                     withCredentials([usernamePassword(credentialsId: "${env.GIT_CREDENTIALS_ID}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')]) {
                         sh '''
-                            git remote set-url origin https://$GIT_USER:$GIT_TOKEN@github.com/Roshanx96/wanderlust.git
-                            git push origin main
+                            # Set remote with credentials and push the current branch
+                            git remote set-url origin https://$GIT_USER:$GIT_TOKEN@github.com/Roshanx96/wanderlust-project.git
+                            echo "Pushing branch ${GIT_BRANCH} to origin"
+                            git push origin ${GIT_BRANCH}
                         '''
                     }
                 }
