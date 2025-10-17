@@ -34,7 +34,7 @@ spec:
         resources:
           requests:
             storage: 5Gi
-        storageClassName: gp3
+        # storageClassName removed to allow cluster default StorageClass to be used
 
 ---
 # Headless service for StatefulSet discovery
