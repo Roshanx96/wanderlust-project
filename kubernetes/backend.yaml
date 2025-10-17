@@ -16,14 +16,27 @@ spec:
       labels:
         app: backend
     spec:
+      # Use an initContainer to copy the image's /app into a writable volume and set ownership
+      initContainers:
+        - name: init-copy-app
+          image: roshanx/wanderlust-backend-image:v1
+          command: ["sh", "-c", "cp -a /app/. /app-data/ && chown -R 1000:1000 /app-data || true"]
+          volumeMounts:
+            - name: app-data
+              mountPath: /app-data
+          securityContext:
+            runAsUser: 0
       containers:
         - name: backend
-          image: roshanx/wanderlust-backend-image:main-9
+          image: roshanx/wanderlust-backend-image:v1
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true
             runAsUser: 1000
             allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: app-data
+              mountPath: /app
           resources:
             requests:
               cpu: "100m"
@@ -52,6 +65,9 @@ spec:
                 name: backend-secret
           ports:
             - containerPort: 8080
+      volumes:
+        - name: app-data
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -66,4 +82,8 @@ spec:
     - port: 8080
       targetPort: 8080
       protocol: TCP
-      nodePort: 31100
+      # nodePort removed because ClusterIP doesn't use nodePort; if external access required,
+      # switch to NodePort and set nodePort explicitly. The frontend uses VITE_API_PATH to talk
+      # to backend-service:31100; if you rely on port mapping via Service, ensure the frontend
+      # config points to the service port (8080) inside cluster. Keep NodePort mapping as part
+      # of ingress or service change if needed.
