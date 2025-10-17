@@ -19,20 +19,28 @@ spec:
       securityContext:
         # Ensure group ownership for mounted volumes and allow child processes to write when appropriate
         fsGroup: 1000
+      # Use an initContainer to copy the image's /app contents into a writable emptyDir
+      # then chown them so the non-root runtime user can modify files (e.g. create .env)
       initContainers:
-        - name: init-chown-app
-          image: busybox:1.36
-          command: ["sh", "-c", "chown -R 1000:1000 /app || true"]
+        - name: init-copy-app
+          image: roshanx/wanderlust-frontend-image:v1
+          command: ["sh", "-c", "cp -a /app/. /app-data/ && chown -R 1000:1000 /app-data || true"]
+          volumeMounts:
+            - name: app-data
+              mountPath: /app-data
           securityContext:
             runAsUser: 0
       containers:
         - name: frontend
-          image: roshanx/wanderlust-frontend-image:main-9
+          image: roshanx/wanderlust-frontend-image:v1
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true
             runAsUser: 1000
             allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: app-data
+              mountPath: /app
           resources:
             requests:
               cpu: "50m"
@@ -59,6 +67,9 @@ spec:
                 name: frontend-config
           ports:
             - containerPort: 5173
+      volumes:
+        - name: app-data
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
