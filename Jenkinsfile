@@ -4,7 +4,7 @@ pipeline {
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
         SONARQUBE_SERVER = 'SonarQube'
-        GIT_REPO_URL = 'https://github.com/Roshanx96/wanderlust.git'
+        GIT_REPO_URL = 'https://github.com/Roshanx96/wanderlust-project.git'
         GIT_BRANCH = 'main'
     }
 
@@ -12,10 +12,10 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                deleteDir()
-                checkout scm
+                git url: 'https://github.com/Roshanx96/wanderlust-project.git', branch: 'main'
             }
         }
+
 
         stage('Determine Build Info') {
             steps {
@@ -45,24 +45,28 @@ pipeline {
 
         stage('SonarQube Analysis') {
             environment {
-                SONAR_TOKEN = credentials('SonarQube')
+                SONAR_TOKEN = credentials('SonarQube') // Set up in Jenkins
             }
             steps {
-                sh '''
-                    export SONAR_SCANNER_HOME="$HOME/.sonar-scanner"
-                    if ! [ -x "$SONAR_SCANNER_HOME/bin/sonar-scanner" ]; then
-                        wget -O sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
-                        unzip -o sonar-scanner.zip
-                        mv sonar-scanner-5.0.1.3006-linux "$SONAR_SCANNER_HOME"
-                    fi
-                    export PATH="$SONAR_SCANNER_HOME/bin:$PATH"
-                '''
-                withSonarQubeEnv("${SONARQUBE_SERVER}") {
-                    sh 'sonar-scanner -Dsonar.projectKey=wanderlust -Dsonar.sources=. -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.login=$SONAR_TOKEN'
+                // Ensure sonar-scanner is installed in user directory and update PATH
+                                sh '''
+                                        export SONAR_SCANNER_HOME="$HOME/.sonar-scanner"
+                                        if ! [ -x "$SONAR_SCANNER_HOME/bin/sonar-scanner" ]; then
+                                            wget -O sonar-scanner-cli-5.0.1.3006-linux.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
+                                            rm -rf sonar-scanner-5.0.1.3006-linux
+                                            unzip -o sonar-scanner-cli-5.0.1.3006-linux.zip
+                                            mv sonar-scanner-5.0.1.3006-linux "$SONAR_SCANNER_HOME"
+                                        fi
+                                        export PATH="$SONAR_SCANNER_HOME/bin:$PATH"
+                                '''
+                // Add sonar-scanner to PATH for the analysis step
+                withEnv(["PATH=$HOME/.sonar-scanner/bin:$PATH"]) {
+                    withSonarQubeEnv("${SONARQUBE_SERVER}") {
+                        sh 'sonar-scanner -Dsonar.projectKey=wanderlust -Dsonar.sources=. -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.login=$SONAR_TOKEN'
+                    }
                 }
             }
         }
-
         stage('Quality Gate') {
             steps {
                 timeout(time: 5, unit: 'MINUTES') {
@@ -70,7 +74,6 @@ pipeline {
                 }
             }
         }
-
         stage('Build & Push Docker Images') {
             steps {
                 script {
