@@ -1,0 +1,81 @@
+pipeline { 
+    agent any
+
+    parameters {
+        string(name: 'FRONTEND_TAG', defaultValue: 'latest', description: 'Docker tag for frontend')
+        string(name: 'BACKEND_TAG', defaultValue: 'latest', description: 'Docker tag for backend')
+    }
+
+    environment {
+        GIT_CREDENTIALS_ID = 'github-credentials'
+        GIT_REPO_URL = 'https://github.com/Roshanx96/wanderlust.git'
+        GIT_BRANCH = 'main'
+    }
+
+    stages {
+
+        stage('Validate Parameters') {
+            steps {
+                script {
+                    if (!params.FRONTEND_TAG?.trim() || !params.BACKEND_TAG?.trim()) {
+                        error("Both FRONTEND_TAG and BACKEND_TAG are required.")
+                    }
+                }
+            }
+        }
+
+        stage('Checkout') {
+            steps {
+                deleteDir()
+                checkout([$class: 'GitSCM',
+                    branches: [[name: "*/${env.GIT_BRANCH}"]],
+                    userRemoteConfigs: [[
+                        url: "${env.GIT_REPO_URL}",
+                        credentialsId: "${env.GIT_CREDENTIALS_ID}"
+                    ]]
+                ])
+            }
+        }
+
+        stage('Update Kubernetes Manifests') {
+            steps {
+                script {
+                    echo "Updating manifests with tags: ${params.FRONTEND_TAG}, ${params.BACKEND_TAG}"
+                    sh """
+                        sed -i 's|image: roshanx/wanderlust-frontend-image:[^ ]*|image: roshanx/wanderlust-frontend-image:${params.FRONTEND_TAG}|g' kubernetes/frontend.yaml
+                        sed -i 's|image: roshanx/wanderlust-backend-image:[^ ]*|image: roshanx/wanderlust-backend-image:${params.BACKEND_TAG}|g' kubernetes/backend.yaml
+                    """
+                }
+            }
+        }
+
+        stage('Commit & Push Changes') {
+            steps {
+                script {
+                    sh """
+                        git config user.name 'Jenkins CI'
+                        git config user.email 'jenkins@yourdomain.com'
+                        git add kubernetes/frontend.yaml kubernetes/backend.yaml
+                        git commit -m 'Update image tags: frontend=${params.FRONTEND_TAG}, backend=${params.BACKEND_TAG}' || echo 'No changes to commit'
+                    """
+                    withCredentials([usernamePassword(credentialsId: "${env.GIT_CREDENTIALS_ID}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')]) {
+                        sh '''
+                            git remote set-url origin https://$GIT_USER:$GIT_TOKEN@github.com/Roshanx96/wanderlust.git
+                            git push origin main
+                        '''
+                    }
+                }
+            }
+        }
+
+    }
+
+    post {
+        success {
+            echo '✅ CD pipeline completed successfully — ArgoCD will deploy automatically.'
+        }
+        failure {
+            echo '❌ CD pipeline failed.'
+        }
+    }
+}

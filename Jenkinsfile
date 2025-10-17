@@ -1,144 +1,110 @@
 pipeline {
     agent any
 
-    parameters {
-        string(name: 'FRONTEND_TAG', description: 'Frontend Docker Image Tag', defaultValue: 'latest')
-        string(name: 'BACKEND_TAG', description: 'Backend Docker Image Tag', defaultValue: 'latest')
-    }
-
     environment {
-        GITHUB_CREDENTIALS = 'Github-cred'
-        DOCKER_CREDENTIALS = 'Dockerhub-cred'
-        DOCKERHUB_USERNAME = 'roshanx' // Your DockerHub username
-        SONAR_HOME = tool "SonarQube"
-        GITHUB_REPO = 'https://github.com/Roshanx96/wanderlust-project.git'
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
+        SONARQUBE_SERVER = 'SonarQube'
+        GIT_REPO_URL = 'https://github.com/Roshanx96/wanderlust.git'
+        GIT_BRANCH = 'main'
     }
 
     stages {
 
-        stage('Validate Parameters') {
+        stage('Checkout') {
+            steps {
+                deleteDir()
+                checkout scm
+            }
+        }
+
+        stage('Determine Build Info') {
             steps {
                 script {
-                    if (!params.FRONTEND_TAG?.trim() || !params.BACKEND_TAG?.trim()) {
-                        error("Docker image tags cannot be empty!")
-                    }
+                    // Generate image tag using branch name and build number (e.g., main-42)
+                    env.BRANCH = env.GIT_BRANCH.replaceAll('/', '-')
+                    env.IMAGE_TAG = "${env.BRANCH}-${env.BUILD_NUMBER}"
+                    echo "Generated Image Tag: ${env.IMAGE_TAG}"
                 }
-            }
-        }
-
-        stage("Workspace Cleanup") {
-            steps {
-                cleanWs()
-            }
-        }
-
-        stage('Checkout Code') {
-            steps {
-                git branch: 'main',
-                    credentialsId: env.GITHUB_CREDENTIALS,
-                    url: env.GITHUB_REPO
             }
         }
 
         stage('Security Scans') {
             parallel {
-                stage('Trivy Filesystem Scan') {
+                stage('Trivy Scan') {
                     steps {
-                        sh '''
-                            trivy fs --exit-code 1 --severity CRITICAL --no-progress . || true
-                        '''
+                        sh 'trivy fs . --exit-code 1 --severity HIGH,CRITICAL || true'
                     }
                 }
-
                 stage('OWASP Dependency Check') {
                     steps {
-                        script {
-                            // Check if dependency-check.sh exists
-                            def exists = sh(script: 'which dependency-check.sh || true', returnStdout: true).trim()
-                            if (exists) {
-                                sh 'dependency-check.sh --project wanderlust --scan . || true'
-                            } else {
-                                echo '⚠️ OWASP Dependency Check skipped: dependency-check.sh not found.'
-                            }
-                        }
+                        sh 'dependency-check.sh --project wanderlust --scan . || true'
                     }
                 }
             }
         }
 
-        stage('Check Sonar') {
-            steps {
-                sh 'echo SONAR_HOME="$SONAR_HOME"'
-                sh '$SONAR_HOME/bin/sonar-scanner --version'
+        stage('SonarQube Analysis') {
+            environment {
+                SONAR_TOKEN = credentials('SonarQube')
             }
-        }
-
-        stage('SonarQube: Code Analysis') {
             steps {
-                withSonarQubeEnv('SonarQube') {
-                    sh '''
-                        ${SONAR_HOME}/bin/sonar-scanner \
-                        -Dsonar.projectKey=wanderlust \
-                        -Dsonar.projectName=wanderlust \
-                        -Dsonar.sources=.
-                    '''
+                sh '''
+                    export SONAR_SCANNER_HOME="$HOME/.sonar-scanner"
+                    if ! [ -x "$SONAR_SCANNER_HOME/bin/sonar-scanner" ]; then
+                        wget -O sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
+                        unzip -o sonar-scanner.zip
+                        mv sonar-scanner-5.0.1.3006-linux "$SONAR_SCANNER_HOME"
+                    fi
+                    export PATH="$SONAR_SCANNER_HOME/bin:$PATH"
+                '''
+                withSonarQubeEnv("${SONARQUBE_SERVER}") {
+                    sh 'sonar-scanner -Dsonar.projectKey=wanderlust -Dsonar.sources=. -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.login=$SONAR_TOKEN'
                 }
             }
         }
 
-        stage('SonarQube: Quality Gate') {
+        stage('Quality Gate') {
             steps {
-                timeout(time: 1, unit: 'MINUTES') {
+                timeout(time: 5, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
             }
         }
 
-        stage('Docker Login') {
+        stage('Build & Push Docker Images') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: env.DOCKER_CREDENTIALS,
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-                    sh '''
-                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                    '''
+                script {
+                    echo "Building Docker images with tag: ${env.IMAGE_TAG}"
+                    
+                    sh """
+                        echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin
+                        docker build -t roshanx/wanderlust-frontend-image:${env.IMAGE_TAG} ./frontend
+                        docker push roshanx/wanderlust-frontend-image:${env.IMAGE_TAG}
+                        
+                        docker build -t roshanx/wanderlust-backend-image:${env.IMAGE_TAG} ./backend
+                        docker push roshanx/wanderlust-backend-image:${env.IMAGE_TAG}
+                    """
                 }
-            }
-        }
-
-        stage('Build & Push Frontend Image') {
-            steps {
-                sh '''
-                    docker build -t ${DOCKERHUB_USERNAME}/wanderlust-frontend-beta:${FRONTEND_TAG} ./frontend
-                    docker push ${DOCKERHUB_USERNAME}/wanderlust-frontend-beta:${FRONTEND_TAG}
-                '''
-            }
-        }
-
-        stage('Build & Push Backend Image') {
-            steps {
-                sh '''
-                    docker build -t ${DOCKERHUB_USERNAME}/wanderlust-backend-beta:${BACKEND_TAG} ./backend
-                    docker push ${DOCKERHUB_USERNAME}/wanderlust-backend-beta:${BACKEND_TAG}
-                '''
             }
         }
 
         stage('Trigger CD Pipeline') {
             steps {
+                echo "Triggering CD pipeline with tag: ${env.IMAGE_TAG}"
                 build job: 'wanderlust-cd', parameters: [
-                    string(name: 'FRONTEND_TAG', value: params.FRONTEND_TAG),
-                    string(name: 'BACKEND_TAG', value: params.BACKEND_TAG)
+                    string(name: 'FRONTEND_TAG', value: env.IMAGE_TAG),
+                    string(name: 'BACKEND_TAG', value: env.IMAGE_TAG)
                 ]
             }
         }
     }
 
     post {
+        success {
+            echo "✅ CI pipeline completed successfully (Tag: ${env.IMAGE_TAG})"
+        }
         failure {
-            echo "❌ The Wanderlust CI pipeline has failed. Please check Jenkins for errors."
+            echo "❌ CI pipeline failed."
         }
     }
 }

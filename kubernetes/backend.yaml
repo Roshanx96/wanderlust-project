@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: roshanx/wanderlust-backend-beta:v1
+          image: roshanx/wanderlust-backend-image:v1
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true
