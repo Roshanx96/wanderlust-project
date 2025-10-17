@@ -34,7 +34,7 @@ spec:
         resources:
           requests:
             storage: 1Gi
-        storageClassName: gp3
+        # storageClassName removed to allow cluster default StorageClass to be used
 ---
 apiVersion: v1
 kind: Service
