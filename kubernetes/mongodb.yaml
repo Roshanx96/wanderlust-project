@@ -36,15 +36,30 @@ spec:
             storage: 5Gi
         # storageClassName removed to allow cluster default StorageClass to be used
 
----
+#---
 # Headless service for StatefulSet discovery
+#apiVersion: v1
+#kind: Service
+#metadata:
+#  name: mongo-headless
+#  namespace: wanderlust
+#spec:
+#  clusterIP: None
+#  selector:
+#    app: mongo
+#  ports:
+#    - port: 27017
+#      targetPort: 27017
+#      protocol: TCP
+---
+# ClusterIP service for MongoDB so the backend can connect using a stable DNS name
 apiVersion: v1
 kind: Service
 metadata:
-  name: mongo-headless
+  name: mongo-service
   namespace: wanderlust
 spec:
-  clusterIP: None
+  type: ClusterIP
   selector:
     app: mongo
   ports:
