@@ -23,7 +23,7 @@ spec:
       # then chown them so the non-root runtime user can modify files (e.g. create .env)
       initContainers:
         - name: init-copy-app
-          image: roshanx/wanderlust-frontend-image:main-2
+          image: roshanx/wanderlust-frontend-image:main-3
           command: ["sh", "-c", "cp -a /app/. /app-data/ && chown -R 1000:1000 /app-data || true"]
           volumeMounts:
             - name: app-data
@@ -32,7 +32,7 @@ spec:
             runAsUser: 0
       containers:
         - name: frontend
-          image: roshanx/wanderlust-frontend-image:main-2
+          image: roshanx/wanderlust-frontend-image:main-3
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true

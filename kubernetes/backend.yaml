@@ -19,7 +19,7 @@ spec:
       # Use an initContainer to copy the image's /app into a writable volume and set ownership
       initContainers:
         - name: init-copy-app
-          image: roshanx/wanderlust-backend-image:v1
+          image: roshanx/wanderlust-backend-image:main-3
           command: ["sh", "-c", "cp -a /app/. /app-data/ && chown -R 1000:1000 /app-data || true"]
           volumeMounts:
             - name: app-data
@@ -59,7 +59,7 @@ spec:
               echo "MongoDB is reachable"
       containers:
         - name: backend
-          image: roshanx/wanderlust-backend-image:v1
+          image: roshanx/wanderlust-backend-image:main-3
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true
