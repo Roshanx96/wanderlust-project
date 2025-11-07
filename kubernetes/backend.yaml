@@ -19,16 +19,46 @@ spec:
       # Use an initContainer to copy the image's /app into a writable volume and set ownership
       initContainers:
         - name: init-copy-app
-          image: roshanx/wanderlust-backend-image:main-1
+          image: roshanx/wanderlust-backend-image:v1
           command: ["sh", "-c", "cp -a /app/. /app-data/ && chown -R 1000:1000 /app-data || true"]
           volumeMounts:
             - name: app-data
               mountPath: /app-data
           securityContext:
             runAsUser: 0
+        - name: wait-for-services
+          image: radial/busyboxplus:curl
+          # Wait for Redis and Mongo to become reachable before starting the backend
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              echo "Waiting for Redis at redis-service:6379"
+              i=0
+              until nc -z redis-service 6379; do
+                i=$((i+1))
+                if [ "$i" -ge 60 ]; then
+                  echo "Timed out waiting for redis-service" >&2
+                  exit 1
+                fi
+                sleep 2
+              done
+              echo "Redis is reachable"
+              echo "Waiting for MongoDB at mongo-service:27017"
+              j=0
+              until nc -z mongo-service 27017; do
+                j=$((j+1))
+                if [ "$j" -ge 60 ]; then
+                  echo "Timed out waiting for mongo-service" >&2
+                  exit 1
+                fi
+                sleep 2
+              done
+              echo "MongoDB is reachable"
       containers:
         - name: backend
-          image: roshanx/wanderlust-backend-image:main-1
+          image: roshanx/wanderlust-backend-image:v1
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true
