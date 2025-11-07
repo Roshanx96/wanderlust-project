@@ -35,14 +35,29 @@ spec:
           requests:
             storage: 1Gi
         # storageClassName removed to allow cluster default StorageClass to be used
+#---
+#apiVersion: v1
+#kind: Service
+#metadata:
+#  name: redis-headless
+#  namespace: wanderlust
+#spec:
+#  clusterIP: None
+#  selector:
+#    app: redis
+#  ports:
+#    - port: 6379
+#      targetPort: 6379
+#      protocol: TCP
 ---
+# ClusterIP service for easier DNS resolution from other pods
 apiVersion: v1
 kind: Service
 metadata:
-  name: redis-headless
+  name: redis-service
   namespace: wanderlust
 spec:
-  clusterIP: None
+  type: ClusterIP
   selector:
     app: redis
   ports:
