@@ -11,3 +11,7 @@ data:
   REFRESH_COOKIE_MAXAGE: "120000"
   REFRESH_TOKEN_EXPIRES_IN: "120s"
   NODE_ENV: "Development"
+  NEW_RELIC_LICENSE_KEY: "your_new_relic_license_key"
+  DEMO_MODE: "true"
+  NO_LOGGING: "true"
+  LOGS: "true"

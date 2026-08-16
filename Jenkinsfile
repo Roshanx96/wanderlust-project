@@ -6,6 +6,8 @@ pipeline {
         SONARQUBE_SERVER = 'SonarQube'
         GIT_REPO_URL = 'https://github.com/Roshanx96/wanderlust-project.git'
         GIT_BRANCH = 'main'
+        GIT_BRANCH = 'demo_ps'
+
     }
 
     stages {
@@ -40,6 +42,7 @@ pipeline {
                         sh 'dependency-check.sh --project wanderlust --scan . || true'
                     }
                 }
+
             }
         }
 

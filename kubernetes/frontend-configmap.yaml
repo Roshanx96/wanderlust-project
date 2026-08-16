@@ -5,3 +5,6 @@ metadata:
   namespace: wanderlust
 data:
   VITE_API_PATH: "http://backend-service:8080"
+  NO_LOGGING: "true"
+  DEMO_MODE: "true"
+  LOGS: "true"
