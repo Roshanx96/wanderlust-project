@@ -15,3 +15,6 @@ data:
   DEMO_MODE: "true"
   NO_LOGGING: "true"
   LOGS: "true"
+  LOGS: "true"
+  LOGS: "2nd time"
+  
